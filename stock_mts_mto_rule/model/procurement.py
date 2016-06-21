@@ -38,7 +38,10 @@ class ProcurementOrder(models.Model):
     def get_mto_qty_to_order(self):
         self.ensure_one()
         uom_obj = self.env['product.uom']
-        stock_location = self.warehouse_id.lot_stock_id.id
+        if self.rule_id and self.rule_id.mts_rule_id:
+            stock_location = self.rule_id.mts_rule_id.location_src_id.id
+        else:
+            stock_location = self.warehouse_id.lot_stock_id.id
         proc_warehouse = self.with_context(location=stock_location)
         virtual_available = proc_warehouse.product_id.virtual_available
         qty_available = uom_obj._compute_qty(self.product_id.uom_id.id,
@@ -56,7 +59,7 @@ class ProcurementOrder(models.Model):
         origin = (proc.group_id and (proc.group_id.name + ":") or "") + \
                  (proc.rule_id and proc.rule_id.name or proc.origin or "/")
         return {
-            'name': rule.name,
+            'name': proc.name,
             'origin': origin,
             'product_qty': qty,
             'product_uos_qty': uos_qty,
@@ -92,6 +95,8 @@ class ProcurementOrder(models.Model):
     def _run(self, procurement):
         if procurement.rule_id and \
                 procurement.rule_id.action == 'split_procurement':
+            if procurement.mts_mto_procurement_ids:
+                return super(ProcurementOrder, self)._run(procurement)
             uom_obj = self.env['product.uom']
             needed_qty = procurement.get_mto_qty_to_order()
             rule = procurement.rule_id

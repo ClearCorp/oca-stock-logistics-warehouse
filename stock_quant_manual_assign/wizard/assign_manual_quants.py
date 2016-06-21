@@ -55,15 +55,18 @@ class AssignManualQuants(models.TransientModel):
     def default_get(self, var_fields):
         super(AssignManualQuants, self).default_get(var_fields)
         move = self.env['stock.move'].browse(self.env.context['active_id'])
-        available_quants = self.env['stock.quant'].search(
-            ['|', ('location_id', '=', move.location_id.id),
-             ('location_id', 'in', move.location_id.child_ids.ids),
-             ('product_id', '=', move.product_id.id),
-             ('qty', '>', 0),
-             '|', ('reservation_id', '=', False),
-             ('reservation_id', '=', move.id)])
+        available_quants = self.env['stock.quant'].search([
+            ('location_id', 'child_of', move.location_id.id),
+            ('product_id', '=', move.product_id.id),
+            ('qty', '>', 0),
+            '|',
+            ('reservation_id', '=', False),
+            ('reservation_id', '=', move.id)
+        ])
         quants_lines = [{
             'quant': x.id,
+            'lot_id': x.lot_id.id,
+            'package_id': x.package_id.id,
             'selected': x in move.reserved_quant_ids,
             'qty': x.qty if x in move.reserved_quant_ids else 0,
             'location_id': x.location_id.id,
@@ -96,6 +99,14 @@ class AssignManualQuantsLines(models.TransientModel):
     location_id = fields.Many2one(
         comodel_name='stock.location', string='Location',
         related='quant.location_id', readonly=True)
+    lot_id = fields.Many2one(
+        comodel_name='stock.production.lot', string='Lot',
+        related='quant.lot_id', readonly=True,
+        groups="stock.group_production_lot")
+    package_id = fields.Many2one(
+        comodel_name='stock.quant.package', string='Package',
+        related='quant.package_id', readonly=True,
+        groups="stock.group_tracking_lot")
     qty = fields.Float(
         string='QTY', digits=dp.get_precision('Product Unit of Measure'))
     selected = fields.Boolean(string='Select')
